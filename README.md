@@ -167,4 +167,4 @@ MIT
 ## Contact
 
 [Shaina Hussain]  
-[Linkedin-https://www.linkedin.com/in/shaina-hussain] | [Leetcode-https://leetcode.com/u/Shaina01/] | [Email-iamshainah@gmail.com]
+[Linkedin -https://www.linkedin.com/in/shaina-hussain] | [Leetcode -https://leetcode.com/u/Shaina01/] | [Email -iamshainah@gmail.com]
