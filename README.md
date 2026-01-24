@@ -2,7 +2,7 @@
 
 ## Problem
 
-B2B sales teams, product managers, and remote teams spend **15-20 hours per month** manually taking meeting notes, extracting action items, and following up on commitments. This manual process leads to:
+B2B sales teams, product managers and remote teams spend **15-20 hours per month** manually taking meeting notes, extracting action items, and following up on commitments. This manual process leads to:
 
 - Missed action items and forgotten commitments
 - Inconsistent note quality across team members  
