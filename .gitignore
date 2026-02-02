@@ -4,3 +4,4 @@ uploads/
 *.wav 
 *.m4a 
 "uploads/" 
+.env
