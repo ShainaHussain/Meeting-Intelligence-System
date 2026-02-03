@@ -1,6 +1,5 @@
 import streamlit as st
 from pathlib import Path
-import whisper
 import os
 import sys
 from groq import Groq
@@ -13,20 +12,16 @@ load_dotenv()
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# Find FFmpeg in Anaconda
-if sys.platform == "win32":
-    conda_base = Path(sys.executable).parent
-    ffmpeg_path = conda_base / "Library" / "bin" / "ffmpeg.exe"
-    if ffmpeg_path.exists():
-        os.environ["PATH"] = str(ffmpeg_path.parent) + os.pathsep + os.environ["PATH"]
-
 # Initialize Groq client
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# Load Whisper model (only once)
-@st.cache_resource
-def load_model():
-    return whisper.load_model("base")
+# Try to import AssemblyAI (optional)
+try:
+    import assemblyai as aai
+    aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
+    ASSEMBLYAI_AVAILABLE = True if os.getenv("ASSEMBLYAI_API_KEY") else False
+except ImportError:
+    ASSEMBLYAI_AVAILABLE = False
 
 def chunk_transcript(text, max_words=5000):
     """Split long transcript into chunks for LLM processing"""
@@ -48,7 +43,7 @@ def validate_transcript(transcript):
     
     meeting_keywords = ['meeting', 'discuss', 'agenda', 'action', 'will', 'should', 
                        'need', 'follow', 'deadline', 'project', 'team', 'work',
-                       'task', 'complete', 'send', 'review', 'update']
+                       'task', 'complete', 'send', 'review', 'update', 'call']
     
     transcript_lower = transcript.lower()
     keyword_count = sum(1 for word in meeting_keywords if word in transcript_lower)
@@ -57,6 +52,106 @@ def validate_transcript(transcript):
         return False, "Content doesn't seem like a meeting recording"
     
     return True, f"Valid meeting content ({word_count} words)"
+
+def transcribe_with_groq(file_path, language_option):
+    """Transcribe using Groq Whisper API - Fast & Free (up to 25MB)"""
+    
+    try:
+        with open(file_path, "rb") as audio_file:
+            if language_option == "Auto-detect & translate to English":
+                # Transcribe and get language info
+                transcription = groq_client.audio.transcriptions.create(
+                    file=audio_file,
+                    model="whisper-large-v3-turbo",
+                    response_format="verbose_json"
+                )
+                
+                # If not English, translate
+                if transcription.language != "en":
+                    audio_file.seek(0)
+                    translation = groq_client.audio.translations.create(
+                        file=audio_file,
+                        model="whisper-large-v3-turbo"
+                    )
+                    return translation.text, transcription.language
+                else:
+                    return transcription.text, "en"
+            else:
+                transcription = groq_client.audio.transcriptions.create(
+                    file=audio_file,
+                    model="whisper-large-v3-turbo",
+                    language="en"
+                )
+                return transcription.text, "en"
+    
+    except Exception as e:
+        raise Exception(f"Groq transcription failed: {str(e)}")
+
+def transcribe_with_assemblyai(file_path, language_option):
+    """Transcribe using AssemblyAI - Handles large files (up to 5GB)"""
+    
+    if not ASSEMBLYAI_AVAILABLE:
+        raise Exception("AssemblyAI not configured. Add ASSEMBLYAI_API_KEY to .env")
+    
+    try:
+        transcriber = aai.Transcriber()
+        
+        # Configure transcription
+        config = aai.TranscriptionConfig(
+            language_detection=True if language_option == "Auto-detect & translate to English" else False,
+            language_code="en" if language_option == "English only" else None
+        )
+        
+        # Upload and transcribe
+        transcript = transcriber.transcribe(str(file_path), config=config)
+        
+        # Wait for completion (AssemblyAI is async)
+        if transcript.status == aai.TranscriptStatus.error:
+            raise Exception(f"AssemblyAI error: {transcript.error}")
+        
+        detected_lang = transcript.language_code if hasattr(transcript, 'language_code') else "en"
+        return transcript.text, detected_lang
+    
+    except Exception as e:
+        raise Exception(f"AssemblyAI transcription failed: {str(e)}")
+
+def smart_transcribe(file_path, file_size_mb, language_option, force_method=None):
+    """
+    Smart routing: Choose best transcription method based on file size
+    
+    - Small files (<20MB): Groq (fastest, free)
+    - Large files (20MB-5GB): AssemblyAI (if available)
+    - Fallback: User's forced choice
+    """
+    
+    # User forced a specific method
+    if force_method == "Groq":
+        if file_size_mb > 25:
+            raise Exception("Groq supports max 25MB. File too large!")
+        return transcribe_with_groq(file_path, language_option), "Groq Whisper (Fast & Free)"
+    
+    elif force_method == "AssemblyAI":
+        if not ASSEMBLYAI_AVAILABLE:
+            raise Exception("AssemblyAI not available. Check API key in .env")
+        return transcribe_with_assemblyai(file_path, language_option), "AssemblyAI (Large Files)"
+    
+    # Auto-routing based on file size
+    else:
+        # Small files: Use Groq (faster, free)
+        if file_size_mb < 20:
+            return transcribe_with_groq(file_path, language_option), "Groq Whisper (Auto-selected)"
+        
+        # Large files: Use AssemblyAI if available
+        elif file_size_mb >= 20:
+            if ASSEMBLYAI_AVAILABLE:
+                return transcribe_with_assemblyai(file_path, language_option), "AssemblyAI (Auto-selected)"
+            else:
+                # No AssemblyAI, check if Groq can handle it
+                if file_size_mb <= 25:
+                    st.warning("⚠️ Large file. AssemblyAI not configured. Using Groq (may be slower)...")
+                    return transcribe_with_groq(file_path, language_option), "Groq Whisper (Fallback)"
+                else:
+                    raise Exception(f"File too large ({file_size_mb:.1f}MB). Need AssemblyAI for files >25MB. Add ASSEMBLYAI_API_KEY to .env")
 
 def extract_action_items(transcript_text):
     """Extract action items from transcript chunk"""
@@ -121,28 +216,30 @@ def extract_action_items_chunked(transcript_text):
     if not all_action_items:
         return "NO ACTION ITEMS FOUND in any section"
     
-    # Combine results
     combined = "\n\n".join(all_action_items)
     
-    # Optional: Deduplicate similar items using LLM
-    st.write("Consolidating results...")
-    dedup_prompt = f"""Here are action items extracted from different parts of a long meeting.
+    # Deduplicate if multiple chunks
+    if len(chunks) > 1:
+        st.write("Consolidating results...")
+        dedup_prompt = f"""Here are action items extracted from different parts of a long meeting.
 Remove any duplicates and present a clean, consolidated list:
 
 {combined}
 
 Consolidated Action Items:"""
+        
+        try:
+            response = groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": dedup_prompt}],
+                temperature=0.3,
+                max_tokens=1500
+            )
+            return response.choices[0].message.content
+        except:
+            return combined
     
-    try:
-        response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": dedup_prompt}],
-            temperature=0.3,
-            max_tokens=1500
-        )
-        return response.choices[0].message.content
-    except:
-        return combined  # Fallback to non-deduplicated
+    return combined
 
 # UI Configuration
 st.set_page_config(
@@ -154,55 +251,107 @@ st.set_page_config(
 # Header
 st.title("🎙️ Meeting Intelligence System")
 st.markdown("""
-Upload meeting recordings up to **200MB** (~3 hours). Supports multiple languages.
+Smart hybrid transcription: **Groq** for speed (free) + **AssemblyAI** for large files.  
+Automatically chooses the best method for your file!
 """)
 
-# Sidebar info
+# Sidebar
 with st.sidebar:
-    st.header("ℹ️ Information")
+    st.header("⚙️ Configuration")
+    
+    # API Status
+    st.markdown("**API Status:**")
+    if os.getenv("GROQ_API_KEY"):
+        st.success("✅ Groq API")
+    else:
+        st.error("❌ Groq API (required)")
+    
+    if ASSEMBLYAI_AVAILABLE:
+        st.success("✅ AssemblyAI (for large files)")
+    else:
+        st.warning("⚠️ AssemblyAI not configured")
+        st.caption("Optional: Add ASSEMBLYAI_API_KEY for files >25MB")
+    
+    st.markdown("---")
+    
+    # Processing mode
+    st.markdown("**Processing Mode:**")
+    
+    processing_options = ["🤖 Auto (Recommended)"]
+    
+    if os.getenv("GROQ_API_KEY"):
+        processing_options.append("🚀 Groq Only (Fast, <25MB)")
+    
+    if ASSEMBLYAI_AVAILABLE:
+        processing_options.append("🎯 AssemblyAI Only (Large files)")
+    
+    processing_mode = st.selectbox(
+        "Choose method:",
+        processing_options,
+        help="Auto mode picks the best option for your file size"
+    )
+    
+    st.markdown("---")
+    
+    # Info
+    st.header("ℹ️ About")
     st.markdown("""
-    **Supported:**
-    - Audio: MP3, WAV, M4A
-    - Size: Up to 200MB (~3 hours)
-    - Languages: 95+ (auto-translated)
+    **Features:**
+    - 🚀 Groq: Up to 25MB, fastest, free
+    - 🎯 AssemblyAI: Up to 5GB, 5hr/month free
+    - 🤖 Auto-routing by file size
+    - 🌐 95+ languages supported
     
-    **Processing Time:**
-    - Short meetings (<30 min): 1-2 min
-    - Long meetings (1-2 hours): 5-10 min
-    - Very long (2-3 hours): 10-15 min
-    
-    **Note:** First use downloads Whisper model (~140MB)
+    **Speed:**
+    - 10 min: ~30 sec
+    - 1 hour: ~2-3 min
+    - 2 hours: ~5 min
     """)
 
 # File uploader
 uploaded_file = st.file_uploader(
     "Choose an audio file",
     type=['mp3', 'wav', 'm4a'],
-    help="Max 200MB - Supports meetings up to 3 hours"
+    help="Auto-routing: Small files use Groq, large files use AssemblyAI"
 )
 
 if uploaded_file is not None:
     
-    # File size check
-    max_size_mb = 200
+    # File info
     file_size_mb = uploaded_file.size / (1024 * 1024)
-    
-    if file_size_mb > max_size_mb:
-        st.error(f"⚠️ File too large ({file_size_mb:.1f}MB). Max: {max_size_mb}MB")
-        st.stop()
     
     # Save file
     file_path = UPLOAD_DIR / uploaded_file.name
-    
     with open(file_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
     
     st.success(f"✅ Uploaded: {uploaded_file.name}")
     st.info(f"📁 Size: {file_size_mb:.2f} MB")
     
-    # Estimate processing time
-    estimated_time = int(file_size_mb * 0.3)  # Rough estimate
-    st.caption(f"⏱️ Estimated processing time: ~{estimated_time} minutes")
+    # Show which method will be used
+    if "Auto" in processing_mode:
+        if file_size_mb < 20:
+            method_info = "🚀 Will use: **Groq** (fast & free)"
+        elif file_size_mb < 25:
+            method_info = "🚀 Will use: **Groq** (at size limit)"
+        elif ASSEMBLYAI_AVAILABLE:
+            method_info = "🎯 Will use: **AssemblyAI** (large file mode)"
+        else:
+            method_info = "⚠️ File too large for Groq. Need AssemblyAI!"
+            st.error("Configure ASSEMBLYAI_API_KEY in .env for files >25MB")
+            st.stop()
+    else:
+        method_info = f"Will use: **{processing_mode.split()[1]}**"
+    
+    st.caption(method_info)
+    
+    # Estimate time
+    if file_size_mb < 20:
+        estimated_minutes = max(1, int(file_size_mb * 0.12))
+    else:
+        estimated_minutes = max(1, int(file_size_mb * 0.08))
+    
+    st.caption(f"⏱️ Estimated time: ~{estimated_minutes} minute{'s' if estimated_minutes > 1 else ''}")
     
     # Language option
     st.markdown("---")
@@ -214,24 +363,39 @@ if uploaded_file is not None:
     
     # Transcribe button
     if st.button("🎯 Transcribe Audio", type="primary"):
-        with st.spinner("Transcribing... Large files may take several minutes..."):
+        
+        # Determine forced method
+        if "Groq Only" in processing_mode:
+            force_method = "Groq"
+        elif "AssemblyAI Only" in processing_mode:
+            force_method = "AssemblyAI"
+        else:
+            force_method = None  # Auto
+        
+        with st.spinner("🚀 Transcribing..."):
             try:
-                model = load_model()
+                # Smart transcription
+                (transcript_text, detected_lang), method_used = smart_transcribe(
+                    file_path, 
+                    file_size_mb, 
+                    language_option,
+                    force_method
+                )
                 
-                # Transcribe (Whisper can handle long audio)
-                if language_option == "Auto-detect & translate to English":
-                    result = model.transcribe(str(file_path), task="translate", verbose=True)
-                    st.info("🌐 Translated to English")
-                else:
-                    result = model.transcribe(str(file_path), verbose=True)
+                # Show which method was used
+                st.success(f"✅ Transcribed using: {method_used}")
                 
-                transcript_text = result["text"]
+                if detected_lang != "en":
+                    st.info(f"🌐 Language: {detected_lang.upper()} → English")
                 
                 # Validate content
                 is_valid, validation_message = validate_transcript(transcript_text)
                 
                 if not is_valid:
                     st.warning(f"⚠️ {validation_message}")
+                    with st.expander("📝 View Transcript"):
+                        st.write(transcript_text)
+                    
                     if not st.button("Continue Anyway"):
                         st.stop()
                 else:
@@ -245,17 +409,31 @@ if uploaded_file is not None:
                 st.subheader("📝 Transcript")
                 st.text_area("Transcribed text:", transcript_text, height=300)
                 
-                # Save transcript
+                # Save
                 transcript_path = UPLOAD_DIR / f"{uploaded_file.name}.txt"
                 with open(transcript_path, "w", encoding="utf-8") as f:
                     f.write(transcript_text)
                 
-                st.success("✅ Transcript saved!")
+                st.download_button(
+                    "📥 Download Transcript",
+                    transcript_text,
+                    file_name=f"{uploaded_file.name}_transcript.txt",
+                    mime="text/plain"
+                )
                 
             except Exception as e:
-                st.error(f"Error: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
+                st.error(f"❌ Error: {str(e)}")
+                
+                # Help messages
+                error_str = str(e).lower()
+                if "api key" in error_str:
+                    st.info("💡 Check your API keys in .env file")
+                elif "too large" in error_str:
+                    st.info("💡 Add ASSEMBLYAI_API_KEY to .env for large files")
+                
+                with st.expander("🔍 Details"):
+                    import traceback
+                    st.code(traceback.format_exc())
     
     # Extract action items
     if 'transcript' in st.session_state and st.session_state.get('filename') == uploaded_file.name:
@@ -264,7 +442,6 @@ if uploaded_file is not None:
         if st.button("✨ Extract Action Items", type="primary"):
             with st.spinner("Extracting action items..."):
                 
-                # Use chunked extraction for long transcripts
                 action_items = extract_action_items_chunked(st.session_state.transcript)
                 
                 if "NO ACTION ITEMS FOUND" in action_items:
@@ -278,9 +455,6 @@ if uploaded_file is not None:
                     with open(action_items_path, "w", encoding="utf-8") as f:
                         f.write(action_items)
                     
-                    st.success("✅ Saved!")
-                    
-                    # Download button
                     st.download_button(
                         "📥 Download Action Items",
                         action_items,
@@ -288,5 +462,10 @@ if uploaded_file is not None:
                         mime="text/plain"
                     )
 
+# Footer
 st.markdown("---")
-st.markdown("<div style='text-align: center; color: gray; font-size: 0.8em;'>Supports meetings up to 3 hours | 95+ languages</div>", unsafe_allow_html=True)
+st.markdown("""
+<div style='text-align: center; color: gray; font-size: 0.8em;'>
+🚀 Groq (free, <25MB) + 🎯 AssemblyAI (large files) | Auto-routing enabled
+</div>
+""", unsafe_allow_html=True)
