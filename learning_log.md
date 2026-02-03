@@ -88,3 +88,52 @@ st.session_state.transcript = transcript_text
 
 ### Next: Deploy system OR optimize speed with Groq Whisper API
 ### Status: ✅ Working
+
+## Day 3 - Hybrid Architecture & Speed Optimization
+
+### Date: [3 Feb 2026]
+
+### Built:
+- Hybrid transcription system with auto-routing (Groq + AssemblyAI)
+- Smart file size detection: small files → Groq, large files → AssemblyAI
+- Removed local Whisper dependency (too slow for production)
+- File handling up to 5GB with automatic service selection
+
+### Key Problem Solved:
+**Speed Bottleneck with Local Whisper**
+- Problem: Local Whisper too slow (1 hour audio = 20-30 min processing)
+- Cause: CPU processing vs cloud GPU processing
+- Solution: Switched to API-based transcription with intelligent routing
+- Result: 10-50x faster (1 hour audio = 2-3 min)
+
+### Core Concepts:
+1. **Hybrid Architecture**: Auto-route between services based on file size
+2. **API Integration**: Groq Whisper (free, 25MB limit) + AssemblyAI (5hr/month free, 5GB limit)
+3. **Smart Routing**: System picks optimal service automatically
+4. **Cost Optimization**: Use free Groq when possible, AssemblyAI only for large files
+5. **Fallback Logic**: Graceful error handling when services unavailable
+
+### Code Patterns:
+```python
+# Smart auto-routing
+def smart_transcribe(file_path, file_size_mb):
+    if file_size_mb < 20:
+        return transcribe_with_groq(file_path)  # Fast & free
+    elif ASSEMBLYAI_AVAILABLE:
+        return transcribe_with_assemblyai(file_path)  # Large files
+    else:
+        raise Exception("Need AssemblyAI for large files")
+
+# Groq Whisper API (replaced local Whisper)
+transcription = groq_client.audio.transcriptions.create(
+    file=audio_file,
+    model="whisper-large-v3-turbo"
+)
+
+# AssemblyAI for large files
+transcriber = aai.Transcriber()
+transcript = transcriber.transcribe(str(file_path))
+```
+
+### Next: Deploy system (Railway/Streamlit Cloud) + Add FastAPI wrapper
+### Status: ✅ Production-ready
