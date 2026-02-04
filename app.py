@@ -153,6 +153,49 @@ def smart_transcribe(file_path, file_size_mb, language_option, force_method=None
                 else:
                     raise Exception(f"File too large ({file_size_mb:.1f}MB). Need AssemblyAI for files >25MB. Add ASSEMBLYAI_API_KEY to .env")
 
+def generate_summary(transcript_text):
+    """Generate a concise meeting summary using LLM"""
+    
+    # For very long transcripts, use first portion for summary
+    word_count = len(transcript_text.split())
+    if word_count > 3000:
+        # Use first 3000 words for summary (covers main points)
+        words = transcript_text.split()[:3000]
+        summary_input = ' '.join(words)
+        note = " (summarized from first portion of long transcript)"
+    else:
+        summary_input = transcript_text
+        note = ""
+    
+    prompt = f"""You are an AI assistant that creates concise meeting summaries.
+
+Analyze this meeting transcript and create a brief summary (3-5 sentences) that captures:
+1. Main purpose/topic of the meeting
+2. Key decisions made
+3. Important discussion points
+4. Next steps or outcomes
+
+Keep it professional and concise. Focus on what matters most.
+
+Transcript:
+{summary_input}
+
+Summary:"""
+
+    try:
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,  # Slightly higher for natural language
+            max_tokens=300    # Limit summary length
+        )
+        
+        summary = response.choices[0].message.content
+        return summary + note
+    
+    except Exception as e:
+        return f"Error generating summary: {str(e)}"
+
 def extract_action_items(transcript_text):
     """Extract action items from transcript chunk"""
     
@@ -251,8 +294,8 @@ st.set_page_config(
 # Header
 st.title("🎙️ Meeting Intelligence System")
 st.markdown("""
-Smart hybrid transcription: **Groq** for speed (free) + **AssemblyAI** for large files.  
-Automatically chooses the best method for your file!
+Smart AI-powered meeting analysis: **Auto-transcription** + **Summary** + **Action Items**  
+Supports 95+ languages with hybrid processing (Groq + AssemblyAI)
 """)
 
 # Sidebar
@@ -294,18 +337,22 @@ with st.sidebar:
     st.markdown("---")
     
     # Info
-    st.header("ℹ️ About")
+    st.header("ℹ️ Features")
     st.markdown("""
-    **Features:**
-    - 🚀 Groq: Up to 25MB, fastest, free
-    - 🎯 AssemblyAI: Up to 5GB, 5hr/month free
-    - 🤖 Auto-routing by file size
+    **New: AI Summary** ✨
+    - 3-5 sentence overview
+    - Key decisions highlighted
+    - Main discussion points
+    
+    **Transcription:**
+    - 🚀 Groq: Up to 25MB, fastest
+    - 🎯 AssemblyAI: Up to 5GB
     - 🌐 95+ languages supported
     
-    **Speed:**
-    - 10 min: ~30 sec
-    - 1 hour: ~2-3 min
-    - 2 hours: ~5 min
+    **Intelligence:**
+    - Meeting summary
+    - Action items extraction
+    - Context-aware analysis
     """)
 
 # File uploader
@@ -405,18 +452,30 @@ if uploaded_file is not None:
                 st.session_state.transcript = transcript_text
                 st.session_state.filename = uploaded_file.name
                 
+                # ============= NEW: GENERATE SUMMARY =============
+                st.markdown("---")
+                with st.spinner("✨ Generating AI summary..."):
+                    summary = generate_summary(transcript_text)
+                    st.session_state.summary = summary
+                
+                # Display summary prominently
+                st.subheader("📊 Meeting Summary")
+                st.info(summary)
+                # =================================================
+                
                 # Display transcript
-                st.subheader("📝 Transcript")
-                st.text_area("Transcribed text:", transcript_text, height=300)
+                st.subheader("📝 Full Transcript")
+                with st.expander("Click to view full transcript", expanded=False):
+                    st.text_area("Transcribed text:", transcript_text, height=300, key="transcript_view")
                 
                 # Save
                 transcript_path = UPLOAD_DIR / f"{uploaded_file.name}.txt"
                 with open(transcript_path, "w", encoding="utf-8") as f:
-                    f.write(transcript_text)
+                    f.write(f"MEETING SUMMARY:\n{summary}\n\n{'='*50}\n\nFULL TRANSCRIPT:\n{transcript_text}")
                 
                 st.download_button(
-                    "📥 Download Transcript",
-                    transcript_text,
+                    "📥 Download Transcript + Summary",
+                    f"MEETING SUMMARY:\n{summary}\n\n{'='*50}\n\nFULL TRANSCRIPT:\n{transcript_text}",
                     file_name=f"{uploaded_file.name}_transcript.txt",
                     mime="text/plain"
                 )
@@ -450,15 +509,36 @@ if uploaded_file is not None:
                     st.subheader("✅ Action Items")
                     st.markdown(action_items)
                     
-                    # Save
-                    action_items_path = UPLOAD_DIR / f"{uploaded_file.name}_action_items.txt"
+                    # Store action items
+                    st.session_state.action_items = action_items
+                    
+                    # Save complete report
+                    summary = st.session_state.get('summary', 'No summary generated')
+                    complete_report = f"""MEETING ANALYSIS REPORT
+{'='*50}
+
+📊 SUMMARY:
+{summary}
+
+{'='*50}
+
+✅ ACTION ITEMS:
+{action_items}
+
+{'='*50}
+
+📝 FULL TRANSCRIPT:
+{st.session_state.transcript}
+"""
+                    
+                    action_items_path = UPLOAD_DIR / f"{uploaded_file.name}_complete_report.txt"
                     with open(action_items_path, "w", encoding="utf-8") as f:
-                        f.write(action_items)
+                        f.write(complete_report)
                     
                     st.download_button(
-                        "📥 Download Action Items",
-                        action_items,
-                        file_name=f"{uploaded_file.name}_action_items.txt",
+                        "📥 Download Complete Report",
+                        complete_report,
+                        file_name=f"{uploaded_file.name}_complete_report.txt",
                         mime="text/plain"
                     )
 
@@ -466,6 +546,6 @@ if uploaded_file is not None:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: gray; font-size: 0.8em;'>
-🚀 Groq (free, <25MB) + 🎯 AssemblyAI (large files) | Auto-routing enabled
+✨ AI-Powered Meeting Intelligence | Summary + Action Items + Transcription
 </div>
 """, unsafe_allow_html=True)
