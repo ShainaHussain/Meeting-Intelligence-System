@@ -205,4 +205,3 @@ with st.expander("📝 Full Transcript"):  # Collapsed by default
 
 ### Next: Key Topics Extraction + PDF Report Generation
 ### Status: ✅ Working
-### Time Spent: ~3 hours
