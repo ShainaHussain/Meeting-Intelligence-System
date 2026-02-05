@@ -2,7 +2,7 @@
 
 AI-powered tool that transcribes meetings, generates summaries, and extracts action items. Supports 95+ languages.
 
-**[Demo](#) • [Quick Start](#quick-start) • [Features](#features)**
+**[Quick Start](#quick-start) • [Features](#features)**
 
 ---
 
