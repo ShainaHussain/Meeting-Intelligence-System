@@ -8,7 +8,7 @@ AI-powered tool that transcribes meetings, generates summaries, and extracts act
 
 ## Why This?
 
-Upload meeting audio → Get instant summary + action items. No more note-taking.
+Upload meeting audio → Get instant summary + action items. No more note taking.
 
 **Example Output:**
 ```
