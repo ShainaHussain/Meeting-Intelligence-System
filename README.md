@@ -1,6 +1,6 @@
 # 🎙️ Meeting Intelligence System
 
-AI-powered tool that transcribes meetings, generates summaries, and extracts action items. Supports 95+ languages.
+AI-powered tool that transcribes meetings, generates summaries, and extracts action items.Supports 95+ languages.
 
 **[Quick Start](#quick-start) • [Features](#features)**
 
