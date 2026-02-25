@@ -1,7 +1,19 @@
+---
+title: Meeting Intelligence System
+emoji: 🎙️
+colorFrom: blue
+colorTo: green
+sdk: streamlit
+sdk_version: 1.32.0
+app_file: app.py
+pinned: false
+---
+
 # 🎙️ Meeting Intelligence System
 
 AI-powered tool that transcribes meetings, generates summaries, and extracts action items.Supports 95+ languages.
 
+<<<<<<< HEAD
 **[Quick Start](#quick-start) • [Features](#features)**
 
 ---
@@ -23,110 +35,55 @@ Engineering fixes bugs before release. Next meeting Friday.
 ---
 
 ## Quick Start
+=======
+**[GitHub](https://github.com/ShainaHussain/Meeting-Intelligence-System)**
+
+---
+
+## Quick Start (Local)
+>>>>>>> 33c0096 (updated with new features)
 
 ```bash
-# 1. Install
 git clone https://github.com/ShainaHussain/Meeting-Intelligence-System.git
 cd Meeting-Intelligence-System
 pip install -r requirements.txt
-
-# 2. Get free API key from console.groq.com
-
-# 3. Create .env file
 echo "GROQ_API_KEY=your_key_here" > .env
-
-# 4. Run
 streamlit run app.py
 ```
 
-That's it. Opens in browser.
+Get a free Groq API key at console.groq.com
 
 ---
 
 ## Features
 
-**What it does:**
-- ✅ Transcribes audio (MP3, WAV, M4A)
-- ✅ Translates 95+ languages to English
-- ✅ Generates 3-5 sentence summary
-- ✅ Extracts action items with owners & deadlines
-- ✅ Handles files up to 5GB
+- Transcribes audio (MP3, WAV, M4A)
+- Translates 95+ languages to English
+- Generates 3-5 sentence summary
+- Extracts action items with owners and deadlines
+- Handles files up to 25 MB (Groq) or 5 GB (AssemblyAI)
 
-**How fast:**
-- 10 min meeting → ~30 seconds
-- 1 hour meeting → ~2-3 minutes
-
-**Cost:**
-- Completely FREE for most use cases
-- Uses Groq API (free tier is generous)
-
----
-
-## How It Works
-
-```
-Upload audio → Auto-transcribe → AI analyzes → Get results
-     ↓              ↓                ↓              ↓
-  Your file    Groq/AssemblyAI   Llama-3.3    Summary + Items
-```
-
-**Smart routing:**
-- Small files (<25MB) → Groq (fastest, free)
-- Large files → AssemblyAI (5hr/month free)
-- You don't choose, system auto-picks best option
+Speed: 10-min meeting ~ 30 seconds | 1-hour meeting ~ 2-3 minutes
+Cost: FREE with Groq API free tier
 
 ---
 
 ## Tech Stack
 
-- **Frontend:** Streamlit
-- **AI:** Groq Whisper, Llama-3.3-70B, AssemblyAI
-- **Language:** Python 3.8+
-
----
-
-## Roadmap
-
-**Done ✅**
-- Transcription with auto-translation
-- AI summary generation
-- Action item extraction
-- Hybrid processing (smart file routing)
-
-**Next 🔜**
-- Key topics extraction
-- PDF reports
-- Speaker identification
-- Search in transcripts
-
----
-
-## FAQ
-
-**Q: Does it cost money?**  
-A: FREE with Groq API key. Optional AssemblyAI for large files (5hr/month free).
-
-**Q: What languages?**  
-A: 95+ including English, Hindi, Spanish, French, etc. Auto-translates to English.
-
-**Q: File size limits?**  
-A: Up to 25MB free (Groq), up to 5GB with AssemblyAI.
-
-**Q: How accurate?**  
-A: Very. Uses state-of-the-art Whisper model (same as OpenAI).
-
----
-
-## Contributing
-
-PRs welcome! This is a learning project built in 4 days.
+- Frontend: Streamlit
+- AI: Groq Whisper, Llama-3.3-70B, AssemblyAI
+- Language: Python 3.8+
 
 ---
 
 ## License
 
-MIT - Free to use and modify
+MIT
 
+<<<<<<< HEAD
 ---
 
 **Built by [Shaina Hussain](https://github.com/ShainaHussain) • ⭐ Star if useful!**
+=======
+Built by Shaina Hussain
+>>>>>>> 33c0096 (updated with new features)

@@ -1,7 +1,21 @@
- 
-uploads/ 
-*.mp3 
-*.wav 
-*.m4a 
-"uploads/" 
+# Environment variables (never commit API keys)
 .env
+
+# Uploaded audio files
+uploads/
+*.mp3
+*.wav
+*.m4a
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# VS Code / editor files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -205,3 +205,32 @@ with st.expander("📝 Full Transcript"):  # Collapsed by default
 
 ### Next: Key Topics Extraction + PDF Report Generation
 ### Status: ✅ Working
+
+## Day 5 - Deployment & Production Readiness
+
+### Date: [25 Feb 2026]
+
+### Note:
+Took a break in between — was working on other things in parallel. 
+Came back to this with fresh eyes and finished it properly.
+
+### Built:
+- Deployed app to Hugging Face Spaces (public demo)
+- Migrated from .env to st.secrets for production key management
+- Added sidebar API key input so public users can use their own keys
+- Cleaned up .gitignore and requirements.txt for production
+- Removed global Groq client initialization (was crashing on startup without key)
+- Lazy client init inside functions — safer and HF-compatible
+
+### Key Problem Solved:
+**Local .env doesn't work on cloud deployment**
+- Problem: HF Spaces has no .env file support
+- Solution: st.secrets (HF) → os.getenv (local) → sidebar input (public users)
+- Result: Same code works locally AND on HF without any changes
+
+### What I Learned:
+- Shipping > perfecting. A deployed project beats a perfect local one every time.
+- Production deployment reveals problems that local testing never shows
+- Real projects have breaks, restarts, and messy timelines — that's normal
+
+### Status: ✅ Live on Hugging Face Spaces
