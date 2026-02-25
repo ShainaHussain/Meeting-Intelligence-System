@@ -412,16 +412,8 @@ if uploaded_file is not None:
                         )
                 except Exception as e:
                     st.error(f"❌ Error extracting action items: {str(e)}")
-
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown("---")
-<<<<<<< HEAD
-st.markdown("""
-<div style='text-align: center; color: gray; font-size: 0.8em;'>
-✨ AI-Powered Meeting Intelligence | Summary + Action Items + Transcription
-</div>
-""", unsafe_allow_html=True)
-=======
 st.markdown(
     "<div style='text-align:center;color:gray;font-size:0.8em;'>"
     "✨ Meeting Intelligence System · Built by "
@@ -429,4 +421,3 @@ st.markdown(
     "</div>",
     unsafe_allow_html=True,
 )
->>>>>>> 33c0096 (updated with new features)
