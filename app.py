@@ -64,19 +64,28 @@ def transcribe_with_groq(file_path, language_option, client):
             )
             return transcription.text, "en"
 
-
 def transcribe_with_assemblyai(file_path, language_option, api_key):
     aai.settings.api_key = api_key
     config = aai.TranscriptionConfig(
         language_detection=(language_option == "Auto-detect & translate to English"),
         language_code="en" if language_option == "English only" else None,
+        speaker_labels=True,  # ← NEW
     )
     transcriber = aai.Transcriber()
     transcript = transcriber.transcribe(str(file_path), config=config)
     if transcript.status == aai.TranscriptStatus.error:
         raise Exception(f"AssemblyAI error: {transcript.error}")
+
     detected_lang = getattr(transcript, "language_code", "en")
-    return transcript.text, detected_lang
+
+    # ── Build speaker-labeled transcript ──────────────────────────────────────
+    if transcript.utterances:
+        labeled_text = ""
+        for utterance in transcript.utterances:
+            labeled_text += f"Speaker {utterance.speaker}: {utterance.text}\n\n"
+        return labeled_text.strip(), detected_lang
+    else:
+        return transcript.text, detected_lang
 
 
 def smart_transcribe(file_path, file_size_mb, language_option, groq_key, assemblyai_key, force_method=None):
@@ -330,6 +339,9 @@ if uploaded_file is not None:
                 )
 
                 st.success(f"✅ Transcribed using: {method_used}")
+                if method_used.startswith("Groq"):
+                    st.caption("ℹ️ Speaker identification not available with Groq. Use AssemblyAI for speaker labels.")
+
                 if detected_lang != "en":
                     st.info(f"🌐 Detected: **{detected_lang.upper()}** → translated to English")
 
@@ -352,11 +364,19 @@ if uploaded_file is not None:
 
                 st.subheader("📊 Meeting Summary")
                 st.info(summary)
-
                 st.subheader("📝 Full Transcript")
                 with st.expander("Click to view full transcript", expanded=False):
-                    st.text_area("Transcribed text:", transcript_text, height=300, key="transcript_view")
-
+                    # If speaker labels exist, display nicely
+                    if "Speaker " in transcript_text and ":\n" in transcript_text:
+                        for line in transcript_text.split("\n\n"):
+                            if line.strip():
+                                if ": " in line:
+                                    speaker, text = line.split(": ", 1)
+                                    st.markdown(f"**{speaker}:** {text}")
+                                else:
+                                    st.write(line)
+                    else:
+                        st.text_area("Transcribed text:", transcript_text, height=300, key="transcript_view")
                 download_content = (
                     f"MEETING SUMMARY:\n{summary}\n\n{'='*50}\n\nFULL TRANSCRIPT:\n{transcript_text}"
                 )
