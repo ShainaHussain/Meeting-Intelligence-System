@@ -218,7 +218,7 @@ Came back to this with fresh eyes and finished it properly.
 - Deployed app to Hugging Face Spaces (public demo)
 - Migrated from .env to st.secrets for production key management
 - Added sidebar API key input so public users can use their own keys
-- Cleaned up .gitignore and requirements.txt for production
+- Cleaned up  .gitignore and requirements.txt for production
 - Removed global Groq client initialization (was crashing on startup without key)
 - Lazy client init inside functions — safer and HF-compatible
 
