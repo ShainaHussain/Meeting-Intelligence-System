@@ -13,11 +13,11 @@
 
 | Upload & Auto-route | Transcription + Summary |
 |---|---|
-| ![Upload](c:\Users\Shaina Hussain\OneDrive\Pictures\Screenshots\Screenshot 2026-03-06 102427.png) | ![Summary](c:\Users\Shaina Hussain\OneDrive\Pictures\Screenshots\Screenshot 2026-03-06 102639.png) |
+| ![Upload](screenshots/screenshot1.png) | ![Summary](screenshots/screenshot2.png) |
 
 | Meeting Summary | Action Items |
 |---|---|
-| ![Summary Output](c:\Users\Shaina Hussain\OneDrive\Pictures\Screenshots\Screenshot 2026-03-06 102800.png) | ![Action Items](c:\Users\Shaina Hussain\OneDrive\Pictures\Screenshots\Screenshot 2026-03-06 102844.png) |
+| ![Summary Output](screenshots/screenshot3.png) | ![Action Items](screenshots/screenshot4.png) |
 
 ---
 
